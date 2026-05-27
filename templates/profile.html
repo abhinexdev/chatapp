@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Profile — Pulse{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+  <div class="profile-card">
+    <a href="{% url 'chat:index' %}" class="profile-back">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+      </svg>
+      Back to Chat
+    </a>
+    <h1>Your Profile</h1>
+    <div class="profile-avatar-row">
+      <img src="{{ user.get_avatar_url }}" alt="{{ user.username }}" class="profile-avatar-img" id="avatarPreview">
+      <div>
+        <h3>{{ user.username }}</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem">Joined {{ user.date_joined|date:"M Y" }}</p>
+      </div>
+    </div>
+    <form method="post" class="auth-form" id="profileForm" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="form-group">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}
+        <div class="form-error">{{ field.errors.0 }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn btn--primary btn--full" style="margin-top:15px">Save Changes</button>
+    </form>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('#profileForm input').forEach(el => {
+    if (el.type !== 'file') el.classList.add('form-input');
+  });
+  const avatarInput = document.getElementById('id_avatar');
+  const avatarPreview = document.getElementById('avatarPreview');
+  if (avatarInput && avatarPreview) {
+    avatarInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) { avatarPreview.src = URL.createObjectURL(file); }
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Enter OTP — Pulse{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-brand">
+    <h1 class="auth-title">Verify Code</h1>
+    <p class="auth-subtitle">Sent to {{ masked_email }}</p>
+  </div>
+
+  <div class="auth-card">
+    <h2 class="auth-card__heading">Enter OTP</h2>
+    <p class="auth-card__sub">Check your email for the 6-digit code</p>
+
+    {% if error %}
+    <div class="form-error otp-error-msg" id="otpErrorMsg" style="margin-bottom:12px;padding:10px;background:rgba(244,63,94,0.1);border-radius:8px;border:1px solid var(--danger)">{{ error }}</div>
+    {% else %}
+    <div class="form-error otp-error-msg hidden" id="otpErrorMsg"></div>
+    {% endif %}
+
+    <form method="post" class="auth-form" id="otpForm">
+      {% csrf_token %}
+      <div class="otp-boxes" id="otpBoxes">
+        <input type="text" maxlength="1" class="otp-input" id="otp0" inputmode="numeric" pattern="[0-9]" autocomplete="one-time-code">
+        <input type="text" maxlength="1" class="otp-input" id="otp1" inputmode="numeric" pattern="[0-9]">
+        <input type="text" maxlength="1" class="otp-input" id="otp2" inputmode="numeric" pattern="[0-9]">
+        <input type="text" maxlength="1" class="otp-input" id="otp3" inputmode="numeric" pattern="[0-9]">
+        <input type="text" maxlength="1" class="otp-input" id="otp4" inputmode="numeric" pattern="[0-9]">
+        <input type="text" maxlength="1" class="otp-input" id="otp5" inputmode="numeric" pattern="[0-9]">
+      </div>
+      <input type="hidden" name="otp" id="otpHidden">
+      <div class="otp-timer-row">
+        <span class="otp-timer" id="otpTimer">10:00</span>
+        <button type="button" class="otp-resend-btn" id="resendBtn" disabled>Resend OTP</button>
+      </div>
+    </form>
+
+    <div class="auth-footer">
+      <p><a href="{% url 'accounts:forgot_password' %}">← Change email</a></p>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const boxes = Array.from(document.querySelectorAll('.otp-input'));
+  const hidden = document.getElementById('otpHidden');
+  const form = document.getElementById('otpForm');
+  const resendBtn = document.getElementById('resendBtn');
+  const timerEl = document.getElementById('otpTimer');
+  const errorMsg = document.getElementById('otpErrorMsg');
+
+  // Focus first box
+  boxes[0].focus();
+
+  // Handle input in each box
+  boxes.forEach((box, i) => {
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !box.value && i > 0) {
+        boxes[i-1].focus();
+        boxes[i-1].value = '';
+      }
+    });
+    box.addEventListener('input', (e) => {
+      const val = e.target.value.replace(/\D/g, '');
+      box.value = val.slice(-1);
+      if (val && i < 5) boxes[i+1].focus();
+      checkComplete();
+    });
+  });
+
+  // Paste support
+  boxes[0].addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+    for (let i = 0; i < 6 && i < text.length; i++) {
+      boxes[i].value = text[i];
+    }
+    if (text.length >= 6) boxes[5].focus();
+    checkComplete();
+  });
+
+  function checkComplete() {
+    const code = boxes.map(b => b.value).join('');
+    hidden.value = code;
+    if (code.length === 6) {
+      // Green animation then auto-submit
+      boxes.forEach(b => b.classList.add('otp-input--success'));
+      setTimeout(() => form.submit(), 400);
+    }
+  }
+
+  // Shake on error (if error is present on load)
+  {% if error %}
+  boxes.forEach(b => { b.classList.add('otp-input--error'); b.value = ''; });
+  setTimeout(() => {
+    boxes.forEach(b => b.classList.remove('otp-input--error'));
+    boxes[0].focus();
+  }, 700);
+  {% endif %}
+
+  // Countdown timer (10 min = 600s)
+  let seconds = 600;
+  const countdown = setInterval(() => {
+    seconds--;
+    if (seconds <= 0) { clearInterval(countdown); timerEl.textContent = 'Expired'; return; }
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    timerEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }, 1000);
+
+  // Resend OTP — 60-second cooldown
+  let resendCooldown = 60;
+  const resendTimer = setInterval(() => {
+    resendCooldown--;
+    resendBtn.textContent = resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend OTP';
+    if (resendCooldown <= 0) {
+      clearInterval(resendTimer);
+      resendBtn.disabled = false;
+    }
+  }, 1000);
+
+  resendBtn.addEventListener('click', async () => {
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'Sending…';
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    try {
+      const resp = await fetch('/accounts/resend-otp/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfInput ? csrfInput.value : '' },
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        resendBtn.textContent = 'Sent!';
+        setTimeout(() => { resendBtn.textContent = 'Resend OTP'; resendBtn.disabled = false; }, 60000);
+      } else {
+        resendBtn.textContent = 'Error';
+        setTimeout(() => { resendBtn.textContent = 'Resend OTP'; resendBtn.disabled = false; }, 3000);
+      }
+    } catch(err) {
+      resendBtn.textContent = 'Resend OTP';
+      resendBtn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}
