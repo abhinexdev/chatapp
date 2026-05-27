@@ -13,9 +13,8 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://chatapp-1n1n.onrender.com',
+    'https://chatapp-ln1n.onrender.com',
 ]
-
 
 INSTALLED_APPS = [
     'daphne',
